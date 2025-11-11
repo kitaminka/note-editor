@@ -1,0 +1,11 @@
+Screen {
+    
+}
+
+Placeholder {
+    width: 50%;
+}
+
+Markdown {
+    width: 70%;
+}

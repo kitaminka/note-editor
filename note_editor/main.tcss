@@ -6,6 +6,12 @@ Placeholder {
     width: 50%;
 }
 
-Markdown {
-    width: 70%;
+#viewer_container {
+     width: 90%;
+    height: 100%;
+    overflow-y: auto;
+}
+
+TextArea:focus {
+    border: tall $accent;
 }

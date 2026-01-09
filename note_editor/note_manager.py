@@ -12,5 +12,5 @@ class NoteManager:
             return f.read()
     
     def write_note(self, name, content) -> None:
-        with open(f"{self.notes_dir}/{name}.md", "w") as f:
+        with open(f"{self.notes_dir}/{name}.md", "w", encoding="utf-8") as f:
             f.write(content)

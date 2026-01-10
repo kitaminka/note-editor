@@ -8,13 +8,30 @@ from textual.events import Blur
 from note_manager import NoteManager
 
 class Editor(TextArea):
-    class Autosave(Message):
+    BINDINGS = [
+        ("ctrl+s", "save()", "Save note"),
+    ]
+
+    class Save(Message):
         def __init__(self, content: str) -> None:
             self.content = content
             super().__init__()
+
+    def on_focus(self) -> None:
+        self.styles.border = ("solid", self.app.theme_variables.get("success"))
+
     def on_blur(self) -> None:
-        # self.notify(self.text)
-        self.post_message(self.Autosave(self.text))
+        self.action_save()
+        self.styles.border = ("solid", self.app.theme_variables.get("border-blurred"))
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        if self.has_focus:
+            self.styles.border = ("solid", self.app.theme_variables.get("accent"))
+
+    def action_save(self) -> None:
+        self.styles.border = ("solid", self.app.theme_variables.get("success"))
+        self.post_message(self.Save(self.text))
+
 
 class NoteEditorApp(App):
     CSS_PATH = "main.tcss"
@@ -49,6 +66,7 @@ class NoteEditorApp(App):
         # self.viewer.update(self.notes.read_note(self.selected_note))
         self.editor.load_text(self.notes.read_note(self.selected_note))
     
-    def on_editor_autosave(self, event: Editor.Autosave):
+    def on_editor_save(self, event: Editor.Save):
         self.notes.write_note(self.selected_note, event.content)
+        self.notify("Note saved")
     

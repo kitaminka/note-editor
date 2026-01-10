@@ -7,11 +7,11 @@ Placeholder {
 }
 
 #viewer_container {
-     width: 90%;
+    width: 90%;
     height: 100%;
     overflow-y: auto;
 }
 
-TextArea:focus {
-    border: tall $accent;
+Editor {
+    border: solid $border-blurred;
 }

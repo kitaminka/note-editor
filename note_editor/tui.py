@@ -4,7 +4,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import ModalScreen
 from textual.message import Message
 from textual import on
-from textual.events import Focus, Blur
+from textual.events import Focus, Blur, Key
 
 from note_manager import NoteManager
 
@@ -16,7 +16,7 @@ class Editor(TextArea):
     class Save(Message):
         pass
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         self.saved = True
         return super().compose()
 
@@ -51,17 +51,23 @@ class NewNoteScreen(ModalScreen[str]):
     def create_note(self, event: Input.Submitted) -> None:
         self.dismiss(event.value.strip() or None)
 
+    @on(Key)
+    def close_screen(self, event: Key) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
+
 class NoteEditorApp(App):
     CSS_PATH = "main.tcss"
     TITLE = "Note Editor"
     BINDINGS = [
         ("ctrl+n", "create_note", "New note"),
+        # ("ctrl+q", "create_note", "New note"),
     ]
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self) -> None:
         self.notes = NoteManager("../notes")
         self.selected_note = None
+        super().__init__()
 
     def compose(self) -> ComposeResult:
         note_items = [ListItem(Label(name)) for name in self.notes.list_notes()]
@@ -92,14 +98,14 @@ class NoteEditorApp(App):
             self.selected_note = None
             self.sub_title = ""
     
-    def on_editor_save(self):
+    def on_editor_save(self) -> None:
         self.action_save_selected_note()
     
-    def action_save_selected_note(self):
+    def action_save_selected_note(self) -> None:
         self.notes.write_note(self.selected_note, self.editor.text)
         self.notify(f"Note saved: {self.selected_note}")
 
-    def action_create_note(self):
+    def action_create_note(self) -> None:
         def create_note(name: str | None) -> None:
             if not name:
                 return

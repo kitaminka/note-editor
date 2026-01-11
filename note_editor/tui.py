@@ -4,6 +4,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import ModalScreen
 from textual.message import Message
 from textual import on
+from textual.events import Focus, Blur
 
 from note_manager import NoteManager
 
@@ -13,24 +14,34 @@ class Editor(TextArea):
     ]
 
     class Save(Message):
-        def __init__(self, content: str) -> None:
-            self.content = content
-            super().__init__()
+        pass
 
-    def on_focus(self) -> None:
+    def compose(self):
+        self.saved = True
+        return super().compose()
+
+    @on(Focus)
+    def show_border(self) -> None:
+        self.saved = True
         self.styles.border = ("solid", self.app.theme_variables.get("success"))
 
-    def on_blur(self) -> None:
-        self.action_save()
-        self.styles.border = ("solid", self.app.theme_variables.get("border-blurred"))
+    @on(Blur)
+    def auto_save(self) -> None:
+        if not self.has_focus:
+            self.action_save()
+            self.styles.border = ("solid", self.app.theme_variables.get("border-blurred"))
 
-    def on_text_area_changed(self) -> None:
+    @on(TextArea.Changed)
+    def show_unsaved_border(self) -> None:
         if self.has_focus:
+            self.saved = False
             self.styles.border = ("solid", self.app.theme_variables.get("accent"))
 
     def action_save(self) -> None:
-        self.styles.border = ("solid", self.app.theme_variables.get("success"))
-        self.post_message(self.Save(self.text))
+        if not self.saved:
+            self.saved = True
+            self.post_message(self.Save())
+            self.styles.border = ("solid", self.app.theme_variables.get("success"))
 
 class NewNoteScreen(ModalScreen[str]):  
     def compose(self) -> ComposeResult:
@@ -57,16 +68,15 @@ class NoteEditorApp(App):
         self.note_list = ListView(*note_items, id="note_list")
         self.editor = Editor.code_editor("", language="markdown")
         self.viewer = Markdown("", id="markdown_viewer")
-        # self.action_update_note_list()
 
-        yield Header()
+        yield Header(icon="●")
         yield Horizontal(
             self.note_list,
             self.editor
             # VerticalScroll(self.viewer, id="viewer_container", can_focus=True)
         )
         yield Footer()
-    
+
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         self.editor.focus()
 
@@ -75,12 +85,19 @@ class NoteEditorApp(App):
         if item:
             label = item.query_one(Label)
             self.selected_note = label.content
+            self.sub_title = self.selected_note
             # self.viewer.update(self.notes.read_note(self.selected_note))
             self.editor.load_text(self.notes.read_note(self.selected_note))
+        else:
+            self.selected_note = None
+            self.sub_title = ""
     
-    def on_editor_save(self, event: Editor.Save):
-        self.notes.write_note(self.selected_note, event.content)
-        self.notify("Note saved")
+    def on_editor_save(self):
+        self.action_save_selected_note()
+    
+    def action_save_selected_note(self):
+        self.notes.write_note(self.selected_note, self.editor.text)
+        self.notify(f"Note saved: {self.selected_note}")
 
     def action_create_note(self):
         def create_note(name: str | None) -> None:
@@ -100,9 +117,11 @@ class NoteEditorApp(App):
                 if name.lower() < existing_name.lower():
                     insert_index = i
                     break
-            
+
             self.note_list.insert(insert_index, [new_item])
 
+            self.action_save_selected_note()
+            
             self.note_list.focus()
             self.note_list.index = insert_index
             self.note_list.action_select_cursor()

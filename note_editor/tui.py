@@ -236,6 +236,8 @@ class NoteEditorApp(App):
 
     def action_change_note_directory(self):
         async def change_directory(new_dir: str):
+            if not new_dir:
+                return
             try:
                 self.config.notes_directory = new_dir
             except:

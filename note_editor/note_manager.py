@@ -39,3 +39,8 @@ class NoteManager:
             raise FileExistsError(f"Note {new_name} already exists.")
 
         old_path.rename(new_path)
+
+    def change_directory(self, new_dir: str) -> None:
+        new_path = Path(new_dir).resolve()
+        new_path.mkdir(parents=True, exist_ok=True)
+        self.notes_dir = new_path

@@ -103,6 +103,8 @@ class NoteEditorApp(App):
         Binding("ctrl+r", "delete_selected_note", "Delete selected note"),
         Binding("ctrl+q", "save_quit", "Save and quit"),
         Binding("f2", "rename_selected_note", "Rename selected note"),
+        Binding("f5", "refresh_note_list", "Refresh note list"),
+        Binding("ctrl+j", "change_note_directory", "Change note directory"),
     ]
 
     def __init__(self) -> None:
@@ -147,7 +149,7 @@ class NoteEditorApp(App):
                 self.no_note()
                 self.notify(f"Note {self.selected_note.content} does not exist.", severity="error")
                 return
-            with self.app.batch_update():
+            with self.batch_update():
                 self.note_editor.disabled = False
                 self.sub_title = self.selected_note.content
                 self.note_editor.change_note(note_text)
@@ -187,7 +189,7 @@ class NoteEditorApp(App):
                 self.notify("A note with this name already exists.", severity="warning")
                 return
 
-            with self.app.batch_update():
+            with self.batch_update():
                 self.save_selected_note()
                 self.note_list.append(ListItem(Label(name)))
                 self.note_list.index = len(self.note_list.children) - 1
@@ -217,9 +219,33 @@ class NoteEditorApp(App):
             return
         def delete_note(delete: bool):
             if delete:
-                with self.app.batch_update():
+                with self.batch_update():
                     self.note_list.pop(self.note_list.index)
                     self.note_list.focus()
                     self.notes.delete_note(self.selected_note.content)
 
         self.push_screen(ConfirmScreen(f"Are you sure you want to delete the note {self.selected_note.content}?"), delete_note)
+    
+    async def action_refresh_note_list(self):
+        self.save_selected_note()
+        note_items = [ListItem(Label(name)) for name in self.notes.list_notes()]
+        await self.note_list.clear()
+        await self.note_list.extend(note_items)
+        self.note_list.index = 0
+        self.note_list.focus()
+
+    def action_change_note_directory(self):
+        async def change_directory(new_dir: str):
+            try:
+                self.config.notes_directory = new_dir
+            except:
+                self.notify("New path is not valid", severity="error")
+                return
+            self.save_selected_note()
+            self.note_list.focus()
+            self.notes.change_directory(new_dir)
+            self.notify("Directory changed")
+            self.no_note()
+            await self.action_refresh_note_list()
+
+        self.push_screen(InputScreen("Notes directory", str(self.config.notes_directory)), change_directory)

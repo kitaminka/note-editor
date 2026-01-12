@@ -200,14 +200,16 @@ class NoteEditorApp(App):
 
     def action_rename_selected_note(self) -> None:
         def rename_note(new_name: str | None):
-            if new_name == self.selected_note.content:
+            if not new_name or new_name == self.selected_note.content:
                 return
             try:
                 self.notes.rename_note(self.selected_note.content, new_name)
             except FileNotFoundError:
                 self.notify(f"Note {self.selected_note.content} does not exist.", severity="error")
+                return
             except FileExistsError:
                 self.notify(f"Note {new_name} already exists.", severity="error")
+                return
             self.selected_note.content = new_name
             self.notify(f"Note renamed to {new_name}")
 

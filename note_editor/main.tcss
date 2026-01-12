@@ -8,8 +8,8 @@ NoteEditor {
 
 ConfirmScreen Vertical {
     align: center middle;
-    width: 30%;
-    height: 30%;
+    width: auto;
+    height: auto;
     border: solid $error;
 }
 

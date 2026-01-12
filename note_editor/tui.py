@@ -1,29 +1,35 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Markdown, TextArea, ListView, ListItem, Label, Input
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, VerticalScroll, HorizontalScroll
 from textual.screen import ModalScreen
 from textual.message import Message
 from textual import on
+from textual.binding import Binding
 from textual.events import Focus, Blur, Key
 
 from note_manager import NoteManager
 
 class NoteEditor(TextArea):
     BINDINGS = [
-        ("ctrl+s", "save", "Save note"),
+        Binding("ctrl+s", "save", "Save note"),
     ]
 
     class Save(Message):
         pass
 
+    class Saved(Message):
+        pass
+
     def compose(self) -> ComposeResult:
-        self.saved = True
+        self.saved_state = True
         return super().compose()
 
     @on(Focus)
     def show_border(self) -> None:
-        self.saved = True
-        self.styles.border = ("solid", self.app.theme_variables.get("success"))
+        if self.saved_state:
+            self.styles.border = ("solid", self.app.theme_variables.get("success"))
+        else:
+            self.styles.border = ("solid", self.app.theme_variables.get("accent"))
 
     @on(Blur)
     def auto_save(self) -> None:
@@ -33,18 +39,23 @@ class NoteEditor(TextArea):
     @on(TextArea.Changed)
     def show_unsaved_border(self) -> None:
         if self.has_focus:
-            self.saved = False
+            self.saved_state = False
             self.styles.border = ("solid", self.app.theme_variables.get("accent"))
 
-    def action_save(self) -> None:
-        if not self.saved:
-            self.saved = True
-            self.post_message(self.Save())
+    @on(Saved)
+    def saved_handler(self) -> None:
+        self.saved_state = True
+        if self.has_focus:
             self.styles.border = ("solid", self.app.theme_variables.get("success"))
+        else:
+            self.styles.border = ("solid", self.app.theme_variables.get("border-blurred"))
+
+    def action_save(self) -> None:
+        self.post_message(self.Save())
     
     def change_note(self, text: str) -> None:
         self.text = text
-        self.saved = True
+        self.saved_state = True
 
 class NewNoteScreen(ModalScreen[str]):  
     def compose(self) -> ComposeResult:
@@ -63,8 +74,8 @@ class NoteEditorApp(App):
     CSS_PATH = "main.tcss"
     TITLE = "Note Editor"
     BINDINGS = [
-        ("ctrl+n", "create_note", "New note"),
-        # ("ctrl+q", "create_note", "New note"),
+        Binding("ctrl+n", "create_note", "New note"),
+        Binding("ctrl+r", "delete_selected_note", "Delete selected note"),
     ]
 
     def __init__(self) -> None:
@@ -85,6 +96,9 @@ class NoteEditorApp(App):
             # VerticalScroll(self.viewer, id="viewer_container", can_focus=True)
         )
         yield Footer()
+    
+    def on_mount(self) -> None:
+        self.no_note()
 
     @on(ListView.Selected)
     def select_note(self, event: ListView.Selected) -> None:
@@ -95,43 +109,60 @@ class NoteEditorApp(App):
         item = event.item
         if item:
             label = item.query_one(Label)
-            self.selected_note = label.content
-            self.sub_title = self.selected_note
-            # self.viewer.update(self.notes.read_note(self.selected_note))
-            self.note_editor.change_note(self.notes.read_note(self.selected_note))
+            self.selected_note = label
+            # self.viewer.update(self.notes.read_note(self.selected_note.content))
+            try:
+                note_text = self.notes.read_note(self.selected_note.content)
+            except FileNotFoundError:
+                self.no_note()
+                self.notify(f"Note {self.selected_note.content} does not exist.", severity="error")
+                return
+            self.note_editor.disabled = False
+            self.sub_title = self.selected_note.content
+            self.note_editor.change_note(note_text)
         else:
-            self.selected_note = None
-            self.sub_title = ""
+            self.no_note()
     
+    def no_note(self) -> None:
+        self.note_editor.disabled = True
+        self.selected_note = None
+        self.sub_title = ""
+        self.note_editor.change_note("")
+
     @on(NoteEditor.Save)
     def save_note(self) -> None:
-        self.notes.write_note(self.selected_note, self.note_editor.text)
-        self.notify(f"Note saved: {self.selected_note}")
+        if not self.selected_note:
+            return
+        try:
+            self.notes.write_note(self.selected_note.content, self.note_editor.text)
+        except FileNotFoundError:
+            self.notify(f"Note {self.selected_note.content} does not exist.", severity="error")
+            return
+        if not self.note_editor.saved_state:
+            self.notify(f"Note saved: {self.selected_note.content}")
+        self.note_editor.post_message(NoteEditor.Saved())
         
     def action_create_note(self) -> None:
         def create_note(name: str | None) -> None:
             if not name:
                 return
-            
-            created = self.notes.create_note(name)
-            if not created:
+            try:
+                created = self.notes.create_note(name)
+            except FileExistsError:
                 self.notify("A note with this name already exists.", severity="warning")
                 return
-            new_item = ListItem(Label(name))
-            current_names = [item.query_one(Label).content for item in self.note_list.children]
 
-            insert_index = len(current_names)
-            for i in range(len(current_names)):
-                existing_name = current_names[i]
-                if name.lower() < existing_name.lower():
-                    insert_index = i
-                    break
-
-            self.note_list.insert(insert_index, [new_item])
-
-            self.note_editor.blur()
-            self.note_list.focus()
-            self.note_list.index = insert_index
-            self.note_list.action_select_cursor()
+            with self.app.batch_update():
+                self.save_note()
+                self.note_list.append(ListItem(Label(name)))
+                self.note_list.index = len(self.note_list.children) - 1
+                self.note_list.focus()
+                self.note_list.action_select_cursor()
 
         self.push_screen(NewNoteScreen(), create_note)
+    
+    def action_delete_selected_note(self) -> None:
+        with self.app.batch_update():
+            self.note_list.pop(self.note_list.index)
+            self.note_list.focus()
+            self.notes.delete_note(self.selected_note.content)

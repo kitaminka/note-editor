@@ -5,13 +5,12 @@ class NoteManager:
         self.notes_dir = Path(notes_dir)
         self.notes_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_note(self, name: str) -> bool:
+    def create_note(self, name: str):
         note_path = self.notes_dir / f"{name}.md"
         if note_path.exists():
             raise FileExistsError(f"Note {name} already exists.")
         
         note_path.touch()
-        return True
 
     def list_notes(self) -> list[str]:
         return sorted(file.stem for file in self.notes_dir.glob("*.md"))

@@ -57,9 +57,14 @@ class NoteEditor(TextArea):
         self.text = text
         self.saved_state = True
 
-class NewNoteScreen(ModalScreen[str]):  
+class InputScreen(ModalScreen[str]):
+    def __init__(self, placeholder: str | None = None, initial_value: str | None = None) -> None:
+        self.placeholder = placeholder
+        self.initial_value = initial_value
+        super().__init__()
+
     def compose(self) -> ComposeResult:
-        yield Input(placeholder="Note name", id="note-name")
+        yield Input(placeholder=self.placeholder, value=self.initial_value)
 
     @on(Input.Submitted)
     def create_note(self, event: Input.Submitted) -> None:
@@ -153,7 +158,7 @@ class NoteEditorApp(App):
             if not name:
                 return
             try:
-                created = self.notes.create_note(name)
+                self.notes.create_note(name)
             except FileExistsError:
                 self.notify("A note with this name already exists.", severity="warning")
                 return
@@ -165,10 +170,22 @@ class NoteEditorApp(App):
                 self.note_list.focus()
                 self.note_list.action_select_cursor()
 
-        self.push_screen(NewNoteScreen(), create_note)
+        self.push_screen(InputScreen("Note name"), create_note)
 
     def action_rename_selected_note(self) -> None:
-        self.notes.rename_note(self.selected_note.content, "noteaaa")
+        def rename_note(new_name: str | None):
+            if new_name == self.selected_note.content:
+                return
+            try:
+                self.notes.rename_note(self.selected_note.content, new_name)
+            except FileNotFoundError:
+                self.notify(f"Note {self.selected_note.content} does not exist.", severity="error")
+            except FileExistsError:
+                self.notify(f"Note {new_name} already exists.", severity="error")
+            self.selected_note.content = new_name
+            self.notify(f"Note renamed to {new_name}")
+
+        self.push_screen(InputScreen("Note name", self.selected_note.content), rename_note)
     
     def action_delete_selected_note(self) -> None:
         with self.app.batch_update():

@@ -1,13 +1,18 @@
-#viewer_container {
-    width: 90%;
-    height: 100%;
-    overflow-y: auto;
-}
-
 ListView {
     width: 20%;
 }
 
 NoteEditor {
     border: solid $border-blurred;
+}
+
+ConfirmScreen Vertical {
+    align: center middle;
+    width: 30%;
+    height: 30%;
+    border: solid $error;
+}
+
+ConfirmScreen {
+    align: center middle;
 }

@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Markdown, TextArea, ListView, ListItem, Label, Input
-from textual.containers import Horizontal, VerticalScroll, HorizontalScroll
+from textual.widgets import Header, Footer, Markdown, TextArea, ListView, ListItem, Label, Input, Static
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.message import Message
 from textual import on
@@ -74,6 +74,24 @@ class InputScreen(ModalScreen[str]):
     def close_screen(self, event: Key) -> None:
         if event.key == "escape":
             self.dismiss(None)
+
+class ConfirmScreen(ModalScreen[bool]):
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__()
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label(content=self.message),
+            Label("Y / N")
+        )
+
+    @on(Key)
+    def key_handler(self, event: Key) -> None:
+        if event.key == "escape" or event.key == "n":
+            self.dismiss(False)
+        elif event.key == "y":
+            self.dismiss(True)
 
 class NoteEditorApp(App):
     CSS_PATH = "main.tcss"
@@ -188,7 +206,14 @@ class NoteEditorApp(App):
         self.push_screen(InputScreen("Note name", self.selected_note.content), rename_note)
     
     def action_delete_selected_note(self) -> None:
-        with self.app.batch_update():
-            self.note_list.pop(self.note_list.index)
-            self.note_list.focus()
-            self.notes.delete_note(self.selected_note.content)
+        if not self.selected_note:
+            self.notify("No note to delete", severity="warning")
+            return
+        def delete_note(delete: bool):
+            if delete:
+                with self.app.batch_update():
+                    self.note_list.pop(self.note_list.index)
+                    self.note_list.focus()
+                    self.notes.delete_note(self.selected_note.content)
+
+        self.push_screen(ConfirmScreen(f"Are you sure you want to delete the note {self.selected_note.content}?"), delete_note)

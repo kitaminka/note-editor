@@ -27,4 +27,16 @@ class NoteManager:
     def delete_note(self, name: str) -> None:
         note_path = self.notes_dir / f"{name}.md"
         
-        note_path.unlink()            
+        note_path.unlink()
+    
+    def rename_note(self, old_name: str, new_name: str) -> None:
+        old_path = self.notes_dir / f"{old_name}.md"
+        new_path = self.notes_dir / f"{new_name}.md"
+
+        if not old_path.exists():
+            raise FileNotFoundError(f"Note {old_name} does not exist.")
+
+        if new_path.exists():
+            raise FileExistsError(f"Note {new_name} already exists.")
+
+        old_path.rename(new_path)

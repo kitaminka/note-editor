@@ -76,6 +76,8 @@ class NoteEditorApp(App):
     BINDINGS = [
         Binding("ctrl+n", "create_note", "New note"),
         Binding("ctrl+r", "delete_selected_note", "Delete selected note"),
+        Binding("ctrl+q", "save_quit", "Save and quit"),
+        Binding("f2", "rename_selected_note", "Rename selected note"),
     ]
 
     def __init__(self) -> None:
@@ -130,7 +132,7 @@ class NoteEditorApp(App):
         self.note_editor.change_note("")
 
     @on(NoteEditor.Save)
-    def save_note(self) -> None:
+    def save_selected_note(self) -> None:
         if not self.selected_note:
             return
         try:
@@ -142,6 +144,10 @@ class NoteEditorApp(App):
             self.notify(f"Note saved: {self.selected_note.content}")
         self.note_editor.post_message(NoteEditor.Saved())
         
+    def action_save_quit(self) -> None:
+        self.save_selected_note()
+        self.exit()
+
     def action_create_note(self) -> None:
         def create_note(name: str | None) -> None:
             if not name:
@@ -153,13 +159,16 @@ class NoteEditorApp(App):
                 return
 
             with self.app.batch_update():
-                self.save_note()
+                self.save_selected_note()
                 self.note_list.append(ListItem(Label(name)))
                 self.note_list.index = len(self.note_list.children) - 1
                 self.note_list.focus()
                 self.note_list.action_select_cursor()
 
         self.push_screen(NewNoteScreen(), create_note)
+
+    def action_rename_selected_note(self) -> None:
+        self.notes.rename_note(self.selected_note.content, "noteaaa")
     
     def action_delete_selected_note(self) -> None:
         with self.app.batch_update():

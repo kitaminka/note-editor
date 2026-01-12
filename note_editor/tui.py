@@ -8,6 +8,8 @@ from textual.binding import Binding
 from textual.events import Focus, Blur, Key
 
 from note_manager import NoteManager
+from config_manager import ConfigManager
+from constants import APP_NAME
 
 class NoteEditor(TextArea):
     BINDINGS = [
@@ -94,8 +96,8 @@ class ConfirmScreen(ModalScreen[bool]):
             self.dismiss(True)
 
 class NoteEditorApp(App):
+    TITLE = APP_NAME
     CSS_PATH = "main.tcss"
-    TITLE = "Note Editor"
     BINDINGS = [
         Binding("ctrl+n", "create_note", "New note"),
         Binding("ctrl+r", "delete_selected_note", "Delete selected note"),
@@ -104,7 +106,10 @@ class NoteEditorApp(App):
     ]
 
     def __init__(self) -> None:
-        self.notes = NoteManager("../notes")
+        self.config = ConfigManager()
+        notes_path = self.config.notes_directory
+
+        self.notes = NoteManager(notes_path)
         self.selected_note = None
         super().__init__()
 
@@ -142,9 +147,10 @@ class NoteEditorApp(App):
                 self.no_note()
                 self.notify(f"Note {self.selected_note.content} does not exist.", severity="error")
                 return
-            self.note_editor.disabled = False
-            self.sub_title = self.selected_note.content
-            self.note_editor.change_note(note_text)
+            with self.app.batch_update():
+                self.note_editor.disabled = False
+                self.sub_title = self.selected_note.content
+                self.note_editor.change_note(note_text)
         else:
             self.no_note()
     
